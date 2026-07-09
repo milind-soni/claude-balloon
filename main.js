@@ -138,11 +138,10 @@ function createWindows() {
     frame: false, transparent: true, resizable: false, hasShadow: false, focusable: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
-  // pure display: one notch above the desktop icons, below every app window,
-  // and it NEVER takes the mouse (double-clicking wallpaper was triggering
-  // macOS "reveal desktop" and scattering everything)
-  try { skyWin.setAlwaysOnTop(true, 'normal', -2147483602); }
-  catch { skyWin.setAlwaysOnTop(false); }
+  // balloons float ON TOP like the tank — Milind traded the desktop-layer
+  // aesthetic for interactions that actually work (clicks at desktop level
+  // were unreliable). Click-through everywhere except balloons/tags.
+  skyWin.setAlwaysOnTop(true, 'screen-saver');
   skyWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreenSpaces: true });
   // forward:true is what lets the renderer SEE the pointer while ignored —
   // without it, hover never registers and nothing in the sky is clickable

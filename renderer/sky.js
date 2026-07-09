@@ -46,7 +46,9 @@ function spawn({ id, task, color }) {
     x: spawnAt.x, y: spawnAt.y, px: spawnAt.x, py: spawnAt.y + 2,
     // bar (weight) particle
     wx: spawnAt.x, wy: spawnAt.y + ROPE * 0.4, wpx: spawnAt.x, wpy: spawnAt.y + ROPE * 0.4,
-    pinned: false,   // becomes true once the user parks the bar
+    pinned: false,   // tag parked by the user
+    parked: false,   // balloon itself parked by the user
+    holding: null, holdMoved: false,
     dragging: false,
     phase: Math.random() * Math.PI * 2,
     wiggle: 0,
@@ -54,6 +56,26 @@ function spawn({ id, task, color }) {
   };
 
   el.querySelector('.body').addEventListener('dblclick', () => toggleConsole(b));
+  const body = el.querySelector('.body');
+  body.addEventListener('pointerdown', (e) => {
+    b.holdMoved = false;
+    b.holding = { dx: e.clientX - b.x, dy: e.clientY - b.y };
+    body.setPointerCapture(e.pointerId);
+  });
+  body.addEventListener('pointermove', (e) => {
+    if (!b.holding) return;
+    const nx = e.clientX - b.holding.dx, ny = e.clientY - b.holding.dy;
+    if (Math.hypot(nx - b.x, ny - b.y) > 5) b.holdMoved = true;
+    if (b.holdMoved) {
+      b.x = nx; b.y = ny; b.px = nx; b.py = ny; // no momentum while held
+    }
+  });
+  const release = () => {
+    if (b.holding && b.holdMoved) b.parked = true; // placed deliberately — stay put
+    b.holding = null;
+  };
+  body.addEventListener('pointerup', release);
+  body.addEventListener('pointercancel', release);
 
   bar.addEventListener('pointerdown', (e) => {
     b.dragging = true;
@@ -67,7 +89,7 @@ function spawn({ id, task, color }) {
   const drop = () => { if (b.dragging) { b.dragging = false; b.pinned = true; } };
   bar.addEventListener('pointerup', drop);
   bar.addEventListener('pointercancel', drop);
-  bar.addEventListener('dblclick', () => { b.pinned = false; }); // set it free again
+  bar.addEventListener('dblclick', () => { b.pinned = false; b.parked = false; }); // set it free again
 
   balloons.set(id, b);
 }
@@ -130,14 +152,22 @@ function deflate(b) {
 function integrate(b) {
   b.phase += 0.013;
 
-  // balloon: buoyant, wandering
-  let vx = (b.x - b.px) * 0.986;
-  let vy = (b.y - b.py) * 0.986;
-  b.px = b.x; b.py = b.y;
-  vy -= 0.05; // helium
-  vx += Math.sin(b.phase) * 0.018 + (Math.random() - 0.5) * 0.012 + b.wiggle * (Math.random() - 0.5);
-  b.wiggle *= 0.9;
-  b.x += vx; b.y += vy;
+  // balloon: buoyant and CALM — no perpetual sway, just a slow rise to its
+  // band and a barely-there breathing bob. (parked/held balloons don't move)
+  if (!b.parked && !b.holding) {
+    let vx = (b.x - b.px) * 0.96;
+    let vy = (b.y - b.py) * 0.96;
+    b.px = b.x; b.py = b.y;
+    const band = 110 + (b.id % 4) * 84;
+    vy += (band - b.y) * 0.0011;              // ease toward altitude
+    vy += Math.sin(b.phase * 0.5) * 0.004;    // faint breathing
+    vx += b.wiggle * (Math.random() - 0.5) * 0.5;
+    b.wiggle *= 0.9;
+    b.x += vx; b.y += vy;
+  } else {
+    b.px = b.x; b.py = b.y;
+    b.wiggle *= 0.9;
+  }
 
   // bar: heavy, dangling (skipped while held or parked)
   if (!b.dragging && !b.pinned) {
@@ -181,8 +211,7 @@ function integrate(b) {
 function render(b) {
   b.el.style.left = b.x + 'px';
   b.el.style.top = b.y + 'px';
-  const lean = Math.max(-14, Math.min(14, (b.x - b.px) * 6 + Math.sin(b.phase) * 3));
-  b.el.style.transform = `translate(-50%,-50%) rotate(${lean.toFixed(2)}deg)`;
+  b.el.style.transform = 'translate(-50%,-50%)';
 
   b.bar.style.left = b.wx + 'px';
   b.bar.style.top = b.wy + 'px';
