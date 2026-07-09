@@ -195,11 +195,12 @@ function dropCard(x, y, ok, text, dir) {
 function tick(ts) {
   for (const b of balloons.values()) {
     if (b.state === 'inflating') {
-      const r = mic.getBoundingClientRect();
+      const r = document.getElementById('nozzleTip').getBoundingClientRect();
       b.x = r.left + r.width / 2;
-      b.y = r.top - 90 - b.scale * 40;
+      b.y = r.top - 46 - b.scale * 52;
       b.targetScale = Math.min(1.6, b.targetScale + level * 0.02);
       b.scale += (b.targetScale + level * 0.12 - b.scale) * 0.25;
+      b.squash = level; // breathing: fatter as you speak
     } else if (b.state === 'floating') {
       b.phase += 0.012;
       const band = 90 + (b.id % 4) * 78; // each balloon claims its own altitude
@@ -214,15 +215,23 @@ function tick(ts) {
     }
     b.el.style.left = b.x + 'px';
     b.el.style.top = b.y + 'px';
-    b.el.style.transform = `translate(-50%,-50%) scale(${b.scale.toFixed(3)}) rotate(${(Math.sin(b.phase) * 4).toFixed(2)}deg)`;
+    const sq = b.squash || 0;
+    b.el.style.transform = `translate(-50%,-50%) scale(${(b.scale * (1 + sq * 0.09)).toFixed(3)}, ${(b.scale * (1 - sq * 0.06)).toFixed(3)}) rotate(${(Math.sin(b.phase) * 4).toFixed(2)}deg)`;
+    if (b.state === 'floating') b.squash = (b.squash || 0) * 0.9;
     if (b.consoleEl) { // the console tags along, without the balloon's sway
       const cx = Math.max(150, Math.min(innerWidth - 150, b.x));
       b.consoleEl.style.left = cx + 'px';
       b.consoleEl.style.top = Math.min(innerHeight - 190, b.y + 120) + 'px';
     }
   }
+  const gn = document.getElementById('gNeedle');
+  if (gn) {
+    gaugeV += (level - gaugeV) * 0.3;
+    gn.style.transform = `translateY(-100%) rotate(${(-80 + gaugeV * 160).toFixed(1)}deg)`;
+  }
   requestAnimationFrame(tick);
 }
+let gaugeV = 0;
 requestAnimationFrame(tick);
 
 // ---------- hold to talk ----------

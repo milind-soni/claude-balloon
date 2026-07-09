@@ -102,7 +102,11 @@ function createWindow() {
     focusable: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
-  win.setAlwaysOnTop(true, 'screen-saver');
+  // balloons live ON THE DESKTOP — behind every window, visible when you
+  // look at your wallpaper. kCGDesktopWindowLevel is -2147483623; Electron
+  // reaches it via a negative relativeLevel on top of 'normal' (0).
+  try { win.setAlwaysOnTop(true, 'normal', -2147483623); }
+  catch { win.setAlwaysOnTop(false); } // fallback: bottom of the normal stack
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreenSpaces: true });
   win.setIgnoreMouseEvents(true, { forward: true });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));

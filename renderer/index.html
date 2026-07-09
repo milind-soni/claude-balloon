@@ -10,11 +10,20 @@
   <div id="sky"></div>
 
   <!-- the one control: hold to speak a task -->
-  <div id="dock" class="ia">
+  <!-- the helium tank, peeking up from behind the Dock. Hold the nozzle
+       and speak — the balloon inflates right on the tip. -->
+  <div id="dock" class="ia" title="Hold the nozzle, speak a task, release">
     <div id="knots" title="popped balloons live here — click one to see its result"></div>
-    <div id="dirLabel" title="Right-click to change the folder tasks work in">~</div>
-    <button id="mic" title="Hold, speak a task, release">🎈</button>
-    <div id="hint">hold to speak a task</div>
+    <div id="mic">
+      <div id="nozzle"><div id="nozzleTip"></div></div>
+      <div id="valve"></div>
+      <div id="tank">
+        <div id="gauge"><div id="gNeedle"></div></div>
+        <div class="tankLabel">HELIUM<br /><b>CLAUDE&nbsp;GRADE</b></div>
+        <div id="dirLabel" title="Click to change the folder tasks work in">~</div>
+        <div id="hint">hold the nozzle · speak</div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
