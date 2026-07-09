@@ -99,7 +99,8 @@ body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-sm
 #mic.rec #valve { box-shadow: 0 0 14px rgba(255, 110, 130, 0.6); }
 
 #tank {
-  width: 92px; height: 154px;
+  position: relative;
+  width: 92px; height: 172px;
   margin-top: -2px;
   border-radius: 22px 22px 8px 8px;
   background:
@@ -153,6 +154,21 @@ body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-sm
   max-width: 82px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #dirLabel { color: #8affc1; cursor: pointer; }
+
+#quit {
+  position: absolute;
+  top: 5px; right: 6px;
+  width: 14px; height: 14px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-size: 8px; line-height: 1;
+  color: rgba(30, 32, 38, 0.55);
+  background: rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+#quit:hover { color: #fff; background: #e6413d; }
+
+#clogo { width: 15px; height: 15px; margin: -1px 0; opacity: 0.9; }
 
 /* ---------- side panel: slides out beside the tank on hover ---------- */
 #sidePanel {

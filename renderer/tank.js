@@ -36,6 +36,10 @@ dirLabel.addEventListener('click', async (e) => {
 dirLabel.addEventListener('pointerdown', (e) => e.stopPropagation());
 applyDir();
 
+// quit button — small ✕ on the tank shoulder
+$('quit').addEventListener('pointerdown', (e) => e.stopPropagation());
+$('quit').addEventListener('click', (e) => { e.stopPropagation(); window.balloon.quit(); });
+
 // ---------- drag the tank anywhere ----------
 let drag = null;
 tank.addEventListener('pointerdown', (e) => {
