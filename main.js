@@ -11,7 +11,6 @@ function whisperBin() {
   return WHISPER_BIN_CANDIDATES.find((p) => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } }) || null;
 }
 
-// Renderer records 16kHz mono PCM and ships a finished WAV — no ffmpeg needed.
 ipcMain.handle('transcribe', async (_e, wavArrayBuffer) => {
   const bin = whisperBin();
   if (!bin) return { ok: false, detail: 'whisper-cli not found — brew install whisper-cpp' };
@@ -29,88 +28,119 @@ ipcMain.handle('transcribe', async (_e, wavArrayBuffer) => {
 });
 
 // ---------- the agent (Claude Code as a library) ----------
-// Each balloon = one independent headless run. The SDK reuses the user's
-// existing Claude Code login — zero setup. The stream's `result` message is
-// the balloon's pop.
 let sdk = null;
 async function agentQuery() {
   if (!sdk) sdk = await import('@anthropic-ai/claude-agent-sdk');
   return sdk.query;
 }
 
-ipcMain.on('run-task', async (e, { id, prompt, cwd }) => {
-  const send = (payload) => { if (!e.sender.isDestroyed()) e.sender.send('task-event', { id, ...payload }); };
+let nextId = 1;
+function toSky(payload) { if (skyWin && !skyWin.isDestroyed()) skyWin.webContents.send('sky-event', payload); }
+function toTank(payload) { if (tankWin && !tankWin.isDestroyed()) tankWin.webContents.send('tank-event', payload); }
+
+// The tank hands a finished recording over: main assigns the id, tells the
+// sky to spawn the floating balloon at the given SCREEN point, and runs the
+// agent — streaming its life to the sky window.
+ipcMain.handle('launch-task', async (_e, { task, color, sx, sy, cwd }) => {
+  const id = nextId++;
+  const sb = skyWin.getBounds();
+  toSky({ type: 'spawn', id, task, color, x: sx - sb.x, y: sy - sb.y, cwd });
+  runAgent(id, task, cwd);
+  return { id };
+});
+
+async function runAgent(id, prompt, cwd) {
   try {
     const query = await agentQuery();
     const stream = query({
       prompt,
       options: {
         cwd: cwd && fs.existsSync(cwd) ? cwd : os.homedir(),
-        permissionMode: 'acceptEdits', // edits inside the balloon's folder don't stall
+        permissionMode: 'acceptEdits',
       },
     });
     for await (const msg of stream) {
       if (msg.type === 'assistant') {
-        // narrate the work: one compact line per thought / tool call
         const blocks = (msg.message && msg.message.content) || [];
         for (const c of blocks) {
           if (c.type === 'text' && c.text && c.text.trim()) {
-            send({ type: 'progress', line: '💭 ' + c.text.trim().slice(0, 90) });
+            toSky({ type: 'progress', id, line: '💭 ' + c.text.trim().slice(0, 90) });
           } else if (c.type === 'tool_use') {
             const i = c.input || {};
             const what = i.file_path || i.command || i.pattern || i.description || i.prompt || '';
-            send({ type: 'progress', line: `⚒ ${c.name}  ${String(what).slice(0, 70)}` });
+            toSky({ type: 'progress', id, line: `⚒ ${c.name}  ${String(what).slice(0, 70)}` });
           }
         }
-        if (!blocks.length) send({ type: 'progress' });
+        if (!blocks.length) toSky({ type: 'progress', id });
       }
       if (msg.type === 'result') {
         const failed = msg.is_error || (msg.subtype && msg.subtype !== 'success');
-        send(failed
-          ? { type: 'error', detail: (msg.result || msg.subtype || 'task failed').slice(0, 400) }
-          : { type: 'done', result: (msg.result || 'done').slice(0, 600) });
+        toSky(failed
+          ? { type: 'error', id, detail: (msg.result || msg.subtype || 'task failed').slice(0, 400) }
+          : { type: 'done', id, result: (msg.result || 'done').slice(0, 600) });
         return;
       }
     }
-    send({ type: 'error', detail: 'agent stream ended without a result' });
+    toSky({ type: 'error', id, detail: 'agent stream ended without a result' });
   } catch (err) {
-    send({ type: 'error', detail: String(err.message || err).slice(0, 400) });
+    toSky({ type: 'error', id, detail: String(err.message || err).slice(0, 400) });
   }
-});
+}
+
+// sky tells main a balloon finished → tank ties the knot (always visible)
+ipcMain.on('tied-knot', (_e, knot) => toTank({ type: 'knot', knot }));
+// tank knot clicked → sky re-shows the card
+ipcMain.on('reshow-card', (_e, entry) => toSky({ type: 'reshow', entry }));
 
 ipcMain.handle('pick-folder', async () => {
   const r = await dialog.showOpenDialog({ title: 'Where should balloon tasks work?', properties: ['openDirectory'] });
   if (r.canceled || !r.filePaths.length) return { canceled: true };
   return { path: r.filePaths[0] };
 });
-
-// balloons float over everything; the window ignores the mouse except when
-// the renderer says the pointer is on something interactive
-let win = null;
-ipcMain.on('set-interactive', (_e, on) => { if (win) win.setIgnoreMouseEvents(!on, { forward: true }); });
-ipcMain.on('quit', () => app.quit());
 ipcMain.on('reveal', (_e, p) => { if (p && fs.existsSync(p)) shell.openPath(p); });
+ipcMain.on('quit', () => app.quit());
 
-function createWindow() {
+// per-window mouse passthrough: only .ia elements catch the pointer
+ipcMain.on('set-interactive', (e, on) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (w) w.setIgnoreMouseEvents(!on, { forward: true });
+});
+
+// ---------- windows ----------
+// tank: small, always on top, clickable — where you speak and balloons inflate
+// sky: the whole desktop, one notch ABOVE the desktop icons (so it still gets
+//      clicks when visible) but below every app window — where balloons live
+let tankWin = null, skyWin = null;
+
+function createWindows() {
   const { workArea } = screen.getPrimaryDisplay();
-  win = new BrowserWindow({
-    ...workArea,
-    frame: false,
-    transparent: true,
-    resizable: false,
-    hasShadow: false,
-    focusable: false,
+
+  const TW = 300, TH = 470;
+  tankWin = new BrowserWindow({
+    x: Math.round(workArea.x + workArea.width / 2 - TW / 2),
+    y: workArea.y + workArea.height - TH,
+    width: TW, height: TH,
+    frame: false, transparent: true, resizable: false, hasShadow: false, focusable: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
-  // balloons live ON THE DESKTOP — behind every window, visible when you
-  // look at your wallpaper. kCGDesktopWindowLevel is -2147483623; Electron
-  // reaches it via a negative relativeLevel on top of 'normal' (0).
-  try { win.setAlwaysOnTop(true, 'normal', -2147483623); }
-  catch { win.setAlwaysOnTop(false); } // fallback: bottom of the normal stack
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreenSpaces: true });
-  win.setIgnoreMouseEvents(true, { forward: true });
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  tankWin.setAlwaysOnTop(true, 'screen-saver');
+  tankWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreenSpaces: true });
+  tankWin.setIgnoreMouseEvents(true, { forward: true });
+  tankWin.loadFile(path.join(__dirname, 'renderer', 'tank.html'));
+
+  skyWin = new BrowserWindow({
+    ...workArea,
+    frame: false, transparent: true, resizable: false, hasShadow: false, focusable: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
+  });
+  // kCGDesktopIconWindowLevel is -2147483603 — sit one above the icons so
+  // balloons are clickable on an exposed desktop, still under all app windows
+  try { skyWin.setAlwaysOnTop(true, 'normal', -2147483602); }
+  catch { skyWin.setAlwaysOnTop(false); }
+  skyWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreenSpaces: true });
+  skyWin.setIgnoreMouseEvents(true, { forward: true });
+  skyWin.loadFile(path.join(__dirname, 'renderer', 'sky.html'));
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(createWindows);
 app.on('window-all-closed', () => app.quit());

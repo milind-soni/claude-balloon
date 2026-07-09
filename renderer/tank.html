@@ -3,17 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="stylesheet" href="style.css" />
-  <title>Claude Balloon</title>
+  <title>Claude Balloon — tank</title>
 </head>
-<body>
-  <!-- balloons + cards get injected here -->
-  <div id="sky"></div>
+<body class="tankwin">
+  <div id="stage"></div>
 
-  <!-- the one control: hold to speak a task -->
-  <!-- the helium tank, peeking up from behind the Dock. Hold the nozzle
-       and speak — the balloon inflates right on the tip. -->
   <div id="dock" class="ia" title="Hold the nozzle, speak a task, release">
-    <div id="knots" title="popped balloons live here — click one to see its result"></div>
+    <div id="knots" title="popped balloons — click one to see its result"></div>
     <div id="mic">
       <div id="nozzle"><div id="nozzleTip"></div></div>
       <div id="valve"></div>
@@ -21,11 +17,11 @@
         <div id="gauge"><div id="gNeedle"></div></div>
         <div class="tankLabel">HELIUM<br /><b>CLAUDE&nbsp;GRADE</b></div>
         <div id="dirLabel" title="Click to change the folder tasks work in">~</div>
-        <div id="hint">hold the nozzle · speak</div>
+        <div id="hint">hold · speak</div>
       </div>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="tank.js"></script>
 </body>
 </html>

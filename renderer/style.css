@@ -10,10 +10,20 @@ body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-sm
 /* ---------- the helium tank (half-peeking from the bottom edge) ---------- */
 #dock {
   position: fixed;
-  bottom: -96px; /* the tank's lower half continues below the screen */
+  bottom: -64px; /* the tank's lower half continues below the screen */
   left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
+/* the tank window is small — everything scales down ~30% */
+.tankwin #tank { width: 88px; height: 150px; padding-top: 9px; gap: 5px; }
+.tankwin #gauge { width: 34px; height: 34px; border-width: 2px; }
+.tankwin #gNeedle { height: 12px; }
+.tankwin #valve { width: 34px; height: 10px; }
+.tankwin #nozzle { width: 13px; height: 21px; }
+.tankwin .tankLabel { font-size: 6.5px; letter-spacing: 1.4px; }
+.tankwin .tankLabel b { font-size: 7px; }
+.tankwin #hint, .tankwin #dirLabel { font-size: 8px; max-width: 80px; }
+.tankwin #stage { position: fixed; inset: 0; pointer-events: none; }
 #mic { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
 
 /* nozzle: the little bent spout you hold while speaking */
