@@ -2,15 +2,55 @@
   "name": "claude-balloon",
   "productName": "Claude Balloon",
   "version": "0.1.0",
-  "description": "Speak a task, watch a balloon carry it — it pops when the agent is done",
+  "description": "Speak a task, watch a balloon carry it \u2014 it pops when the agent is done",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac --arm64",
+    "release:mac": "bash scripts/release.sh"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "latest"
+  },
+  "build": {
+    "appId": "com.milindsoni.claudeballoon",
+    "productName": "Claude Balloon",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "!build/**",
+      "!scripts/**"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "artifactName": "ClaudeBalloon-${version}-${arch}-mac.${ext}",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": "arm64"
+        }
+      ],
+      "identity": "Milind Soni (993D98NH4J)",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Claude Balloon listens while you hold the nozzle to speak a task."
+      }
+    },
+    "dmg": {
+      "title": "Claude Balloon"
+    }
   }
 }

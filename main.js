@@ -64,13 +64,15 @@ async function runAgent(id, prompt, cwd) {
       if (msg.type === 'assistant') {
         const blocks = (msg.message && msg.message.content) || [];
         for (const c of blocks) {
+          let line = null;
           if (c.type === 'text' && c.text && c.text.trim()) {
-            toTank({ type: 'progress', id, line: '💭 ' + c.text.trim().slice(0, 90) });
+            line = '💭 ' + c.text.trim().slice(0, 90);
           } else if (c.type === 'tool_use') {
             const i = c.input || {};
             const what = i.file_path || i.command || i.pattern || i.description || i.prompt || '';
-            toTank({ type: 'progress', id, line: `⚒ ${c.name}  ${String(what).slice(0, 70)}` });
+            line = `⚒ ${c.name}  ${String(what).slice(0, 70)}`;
           }
+          if (line) { toTank({ type: 'progress', id, line }); toSky({ type: 'progress', id, line }); }
         }
         toSky({ type: 'progress', id });
       }

@@ -24,13 +24,14 @@ function spawn({ id, task, color }) {
   const el = document.createElement('div');
   el.className = 'bal';
   el.style.setProperty('--bc', color);
-  el.innerHTML = `<div class="body"></div>`;
+  el.innerHTML = `<div class="body ia"></div><div class="tag"></div>`;
+  el.querySelector('.tag').textContent = task;
+  el.title = task;
   sky.appendChild(el);
 
   const bar = document.createElement('div');
   bar.className = 'bar ia';
-  bar.textContent = task;
-  bar.title = task + ' — drag me to park this balloon';
+  bar.title = 'drag to park this balloon · double-click to set it free';
   sky.appendChild(bar);
 
   const rope = document.createElementNS(NS, 'path');
@@ -47,7 +48,10 @@ function spawn({ id, task, color }) {
     dragging: false,
     phase: Math.random() * Math.PI * 2,
     wiggle: 0,
+    task, lines: [], consoleEl: null,
   };
+
+  el.querySelector('.body').addEventListener('dblclick', () => toggleConsole(b));
 
   bar.addEventListener('pointerdown', (e) => {
     b.dragging = true;
@@ -67,8 +71,28 @@ function spawn({ id, task, color }) {
 }
 
 function killBalloon(b) {
+  if (b.consoleEl) b.consoleEl.remove();
   b.el.remove(); b.bar.remove(); b.rope.remove();
   balloons.delete(b.id);
+}
+
+// the little terminal: double-click a balloon to watch its agent work
+function toggleConsole(b) {
+  if (b.consoleEl) { b.consoleEl.remove(); b.consoleEl = null; return; }
+  const c = document.createElement('div');
+  c.className = 'bcon ia';
+  c.innerHTML = `<div class="bconHead"><span></span><span class="bconX">✕</span></div><div class="bconBody"></div>`;
+  c.querySelector('.bconHead span').textContent = '🎈 ' + b.task.slice(0, 30);
+  c.querySelector('.bconX').addEventListener('click', () => { c.remove(); b.consoleEl = null; });
+  sky.appendChild(c);
+  b.consoleEl = c;
+  renderConsole(b);
+}
+function renderConsole(b) {
+  if (!b.consoleEl) return;
+  const body = b.consoleEl.querySelector('.bconBody');
+  body.textContent = b.lines.length ? b.lines.slice(-40).join('\n') : 'waiting for the first step…';
+  body.scrollTop = body.scrollHeight;
 }
 
 function popBalloon(b) {
@@ -161,6 +185,10 @@ function render(b) {
   b.bar.style.left = b.wx + 'px';
   b.bar.style.top = b.wy + 'px';
   b.bar.classList.toggle('pinned', b.pinned);
+  if (b.consoleEl) {
+    b.consoleEl.style.left = Math.max(170, Math.min(innerWidth - 170, b.x)) + 'px';
+    b.consoleEl.style.top = Math.min(innerHeight - 200, b.y + 140) + 'px';
+  }
 
   // rope from balloon knot to bar top — sags when slack, straight when taut
   const kx = b.x, ky = b.y + 50;
@@ -185,7 +213,10 @@ window.balloon.onSkyEvent((d) => {
   if (d.type === 'spawn') return spawn(d);
   const b = balloons.get(d.id);
   if (!b) return;
-  if (d.type === 'progress') b.wiggle = 2.4;
+  if (d.type === 'progress') {
+    b.wiggle = 0.7; // a polite little stir, not a shake
+    if (d.line) { b.lines.push(d.line); if (b.lines.length > 200) b.lines.shift(); renderConsole(b); }
+  }
   if (d.type === 'done') popBalloon(b);
   if (d.type === 'error') deflate(b);
 });

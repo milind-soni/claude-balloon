@@ -49,6 +49,23 @@ body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-sm
 }
 .bal.err .body { filter: grayscale(0.75) brightness(0.75); }
 
+/* the weight bar at the string's end — a small grip you drag around */
+.bar {
+  position: absolute;
+  width: 34px; height: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #d9dce2, #9298a2 60%, #6a6e77);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+}
+.bar:active { cursor: grabbing; }
+.bar.pinned { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 8px rgba(138, 255, 193, 0.5); }
+
+/* sky console hangs under its balloon */
+#sky .bcon { position: absolute; transform: translateX(-50%); }
+
 /* burst particles */
 .bit {
   position: absolute;
