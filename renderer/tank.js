@@ -151,7 +151,7 @@ function tick() {
     inflating.el.style.transform =
       `translate(-50%,-50%) scale(${(s * (1 + level * 0.09)).toFixed(3)}, ${(s * (1 - level * 0.06)).toFixed(3)})`;
     inflating.cap.style.left = r.left + r.width / 2 + 'px';
-    inflating.cap.style.top = r.top - 34 - s * 50 + 58 * s + 26 + 'px';
+    inflating.cap.style.top = r.top - 34 - s * 50 + 'px'; // centered on the balloon
   }
   gaugeV += (level - gaugeV) * 0.3;
   $('gNeedle').style.transform = `translateY(-100%) rotate(${(-80 + gaugeV * 160).toFixed(1)}deg)`;

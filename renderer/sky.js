@@ -18,20 +18,22 @@ document.addEventListener('pointerout', (e) => { if (!e.relatedTarget) window.ba
 
 let spawnAt = { x: innerWidth / 2, y: innerHeight - 80 }; // the nozzle's spot
 const balloons = new Map(); // id -> b
-const ROPE = 130; // string length balloon → bar
+const ROPE = 78; // string length balloon → tag (hangs just below, like the original)
 
 function spawn({ id, task, color }) {
   const el = document.createElement('div');
   el.className = 'bal';
   el.style.setProperty('--bc', color);
-  el.innerHTML = `<div class="body ia"></div><div class="tag"></div>`;
-  el.querySelector('.tag').textContent = task;
+  el.innerHTML = `<div class="body ia"></div>`;
   el.title = task;
   sky.appendChild(el);
 
+  // the black task tag hangs under the balloon and doubles as the weight:
+  // drag it to park the balloon, double-click it to set it free
   const bar = document.createElement('div');
-  bar.className = 'bar ia';
-  bar.title = 'drag to park this balloon · double-click to set it free';
+  bar.className = 'skytag ia';
+  bar.textContent = task;
+  bar.title = task + ' — drag to park · double-click to free';
   sky.appendChild(bar);
 
   const rope = document.createElementNS(NS, 'path');

@@ -144,7 +144,9 @@ function createWindows() {
   try { skyWin.setAlwaysOnTop(true, 'normal', -2147483602); }
   catch { skyWin.setAlwaysOnTop(false); }
   skyWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreenSpaces: true });
-  skyWin.setIgnoreMouseEvents(true);
+  // forward:true is what lets the renderer SEE the pointer while ignored —
+  // without it, hover never registers and nothing in the sky is clickable
+  skyWin.setIgnoreMouseEvents(true, { forward: true });
   skyWin.loadFile(path.join(__dirname, 'renderer', 'sky.html'));
 }
 

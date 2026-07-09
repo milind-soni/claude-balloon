@@ -49,34 +49,38 @@ body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-sm
 }
 .bal.err .body { filter: grayscale(0.75) brightness(0.75); }
 
-/* live transcript under the inflating balloon */
+/* live transcript floats ON the balloon while you speak */
 .liveCap {
   position: fixed;
-  transform: translateX(-50%);
-  max-width: 300px;
+  transform: translate(-50%, -50%);
+  max-width: 150px;
   font-family: ui-monospace, "SF Mono", monospace;
-  font-size: 11px; line-height: 1.5;
-  color: rgba(240, 242, 248, 0.95);
-  background: rgba(10, 11, 14, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 5px 10px; border-radius: 9px;
+  font-size: 10px; line-height: 1.45;
+  color: rgba(240, 242, 248, 0.96);
+  background: rgba(10, 11, 14, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 8px; border-radius: 8px;
   text-align: center;
   pointer-events: none;
+  z-index: 3;
 }
 
-/* the weight bar at the string's end — a small grip you drag around */
-.bar {
+/* the black task tag at the string's end — it IS the weight you drag */
+.skytag {
   position: absolute;
-  width: 34px; height: 10px;
   transform: translate(-50%, -50%);
-  border-radius: 5px;
-  background: linear-gradient(180deg, #d9dce2, #9298a2 60%, #6a6e77);
-  border: 1px solid rgba(0, 0, 0, 0.4);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  max-width: 170px;
+  font-family: ui-monospace, monospace; font-size: 9.5px;
+  color: rgba(240, 242, 248, 0.92);
+  background: rgba(10, 11, 14, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 9px; border-radius: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   cursor: grab;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
 }
-.bar:active { cursor: grabbing; }
-.bar.pinned { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 8px rgba(138, 255, 193, 0.5); }
+.skytag:active { cursor: grabbing; }
+.skytag.pinned { border-color: rgba(138, 255, 193, 0.55); box-shadow: 0 3px 8px rgba(0,0,0,.35), 0 0 8px rgba(138, 255, 193, 0.35); }
 
 /* sky console hangs under its balloon */
 #sky .bcon { position: absolute; transform: translateX(-50%); }
