@@ -1,0 +1,171 @@
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+html, body { background: transparent; width: 100%; height: 100%; overflow: hidden; }
+body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-smoothing: antialiased; pointer-events: none; }
+
+/* only .ia elements catch the mouse — the rest of the screen stays yours */
+.ia { pointer-events: auto; }
+
+#sky { position: fixed; inset: 0; }
+
+/* ---------- the dock ---------- */
+#dock {
+  position: fixed;
+  bottom: 26px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+}
+#mic {
+  width: 62px; height: 62px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.16), transparent 55%),
+    linear-gradient(180deg, #23242b, #101116);
+  font-size: 26px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s;
+}
+#mic:hover { transform: scale(1.06); }
+#mic.rec {
+  border-color: rgba(255, 110, 130, 0.7);
+  box-shadow: 0 0 24px rgba(255, 110, 130, 0.45), 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+#hint, #dirLabel {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 10px; letter-spacing: 0.5px;
+  color: rgba(235, 238, 245, 0.75);
+  background: rgba(10, 11, 14, 0.72);
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+#dirLabel { color: #8affc1; cursor: pointer; }
+
+/* knots: one tiny souvenir per popped balloon */
+#knots { display: flex; gap: 6px; align-items: center; min-height: 12px; }
+.knot {
+  width: 10px; height: 12px;
+  border-radius: 50% 50% 45% 45% / 60% 60% 38% 38%;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.65), transparent 45%),
+    var(--bc, #ff8c94);
+  cursor: pointer;
+  transform: rotate(12deg);
+  transition: transform 0.15s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+.knot:nth-child(even) { transform: rotate(-10deg); }
+.knot:hover { transform: scale(1.5) rotate(0deg); }
+.knot.sad { filter: grayscale(0.8) brightness(0.7); }
+
+/* ---------- balloons ---------- */
+.bal {
+  position: absolute;
+  width: 92px; height: 110px;
+  transform: translate(-50%, -50%);
+  will-change: transform, left, top;
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.35));
+}
+.bal .body {
+  width: 100%; height: 100%;
+  border-radius: 50% 50% 47% 47% / 56% 56% 42% 42%;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.08) 38%),
+    var(--bc, #ff8c94);
+  position: relative;
+}
+.bal .body::after { /* the tied-off knot */
+  content: "";
+  position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top: 9px solid var(--bc, #ff8c94);
+}
+.bal .string {
+  position: absolute; left: 50%; top: 100%;
+  width: 2px; height: 58px;
+  background: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,.12));
+  transform-origin: top center;
+}
+.bal .tag {
+  position: absolute; top: calc(100% + 62px); left: 50%; transform: translateX(-50%);
+  max-width: 150px;
+  font-family: ui-monospace, monospace; font-size: 9.5px;
+  color: rgba(240, 242, 248, 0.9);
+  background: rgba(10, 11, 14, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3px 8px; border-radius: 7px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bal.err .body { filter: grayscale(0.75) brightness(0.75); }
+
+/* burst particles */
+.bit {
+  position: absolute;
+  width: 9px; height: 9px; border-radius: 2px;
+  background: var(--bc, #ff8c94);
+  animation: fly 0.75s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes fly {
+  to { transform: translate(var(--fx), var(--fy)) rotate(540deg); opacity: 0; }
+}
+
+/* the little console: double-click a balloon to watch the agent work */
+.bcon {
+  position: absolute;
+  width: 320px; height: 170px;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column;
+  background: rgba(8, 9, 12, 0.93);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 11px;
+  overflow: hidden;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+.bconHead {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 10px;
+  font-family: ui-monospace, monospace; font-size: 9px; letter-spacing: 1px;
+  text-transform: uppercase; color: rgba(235, 238, 245, 0.55);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.bconX { cursor: pointer; font-size: 11px; }
+.bconX:hover { color: #ff7a70; }
+.bconBody {
+  flex: 1;
+  padding: 8px 10px;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 10px; line-height: 1.55;
+  color: #a9e8bd;
+  white-space: pre-wrap; word-break: break-word;
+  overflow-y: auto;
+}
+
+/* result card that falls out of the pop */
+.card {
+  position: absolute;
+  width: 300px; max-height: 220px;
+  transform: translateX(-50%);
+  background: rgba(14, 15, 19, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 13px;
+  padding: 12px 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  animation: drop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+  cursor: pointer;
+}
+@keyframes drop { from { transform: translate(-50%, -26px); opacity: 0; } }
+.card .ct {
+  font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.card.ok .ct { color: #8fe3a4; }
+.card.bad .ct { color: #ff7a70; }
+.card .cb {
+  font-size: 12px; line-height: 1.5; color: #d9dce3;
+  max-height: 168px; overflow: hidden;
+  white-space: pre-wrap; word-break: break-word;
+}
+.card .cx {
+  margin-top: 7px; font-size: 9.5px; color: rgba(235, 238, 245, 0.45);
+  font-family: ui-monospace, monospace;
+}

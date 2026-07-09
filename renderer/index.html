@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Claude Balloon</title>
+</head>
+<body>
+  <!-- balloons + cards get injected here -->
+  <div id="sky"></div>
+
+  <!-- the one control: hold to speak a task -->
+  <div id="dock" class="ia">
+    <div id="knots" title="popped balloons live here — click one to see its result"></div>
+    <div id="dirLabel" title="Right-click to change the folder tasks work in">~</div>
+    <button id="mic" title="Hold, speak a task, release">🎈</button>
+    <div id="hint">hold to speak a task</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "claude-balloon",
+  "productName": "Claude Balloon",
+  "version": "0.1.0",
+  "description": "Speak a task, watch a balloon carry it — it pops when the agent is done",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest"
+  }
+}
