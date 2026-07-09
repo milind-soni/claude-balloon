@@ -49,6 +49,21 @@ body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-sm
 }
 .bal.err .body { filter: grayscale(0.75) brightness(0.75); }
 
+/* live transcript under the inflating balloon */
+.liveCap {
+  position: fixed;
+  transform: translateX(-50%);
+  max-width: 300px;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11px; line-height: 1.5;
+  color: rgba(240, 242, 248, 0.95);
+  background: rgba(10, 11, 14, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 5px 10px; border-radius: 9px;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* the weight bar at the string's end — a small grip you drag around */
 .bar {
   position: absolute;

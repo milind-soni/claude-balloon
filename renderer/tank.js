@@ -73,16 +73,19 @@ async function startRec() {
   src.connect(node); node.connect(ctx.destination);
   audio = { ctx, stream, node, chunks };
 }
+function chunksToWav(chunks, minSamples) {
+  const n = chunks.reduce((a, c) => a + c.length, 0);
+  if (n < (minSamples || 4000)) return null;
+  const pcm = new Float32Array(n);
+  let o = 0; for (const c of chunks) { pcm.set(c, o); o += c.length; }
+  return encodeWav(pcm, 16000);
+}
 function stopRec() {
   if (!audio) return null;
   const { ctx, stream, node, chunks } = audio;
   node.disconnect(); stream.getTracks().forEach((t) => t.stop()); ctx.close();
   audio = null; level = 0;
-  const n = chunks.reduce((a, c) => a + c.length, 0);
-  if (n < 4000) return null;
-  const pcm = new Float32Array(n);
-  let o = 0; for (const c of chunks) { pcm.set(c, o); o += c.length; }
-  return encodeWav(pcm, 16000);
+  return chunksToWav(chunks);
 }
 function encodeWav(f32, rate) {
   const buf = new ArrayBuffer(44 + f32.length * 2);
@@ -110,9 +113,31 @@ function makeInflating() {
   const color = COLORS[colorIdx = (colorIdx + 1) % COLORS.length];
   el.style.setProperty('--bc', color);
   el.innerHTML = `<div class="body"></div>`;
+  const cap = document.createElement('div');
+  cap.className = 'liveCap';
+  cap.textContent = '…';
   stage.appendChild(el);
-  return { el, scale: 0.3, target: 0.3, color };
+  stage.appendChild(cap);
+  return { el, cap, scale: 0.3, target: 0.3, color };
 }
+
+// live transcript: every ~1.2s re-run whisper on the audio so far — the
+// sentence grows (and self-corrects) on the balloon while you speak
+let partialTimer = null, partialBusy = false;
+function startLiveCaption() {
+  partialTimer = setInterval(async () => {
+    if (!audio || partialBusy || !inflating) return;
+    const wav = chunksToWav(audio.chunks, 9000); // ≥ ~0.6s of speech
+    if (!wav) return;
+    partialBusy = true;
+    try {
+      const t = await window.balloon.transcribe(wav);
+      if (holding && inflating && t.ok) inflating.cap.textContent = t.text;
+    } catch {}
+    partialBusy = false;
+  }, 1200);
+}
+function stopLiveCaption() { clearInterval(partialTimer); partialTimer = null; }
 
 let gaugeV = 0;
 function tick() {
@@ -125,6 +150,8 @@ function tick() {
     inflating.el.style.top = r.top - 34 - s * 50 + 'px';
     inflating.el.style.transform =
       `translate(-50%,-50%) scale(${(s * (1 + level * 0.09)).toFixed(3)}, ${(s * (1 - level * 0.06)).toFixed(3)})`;
+    inflating.cap.style.left = r.left + r.width / 2 + 'px';
+    inflating.cap.style.top = r.top - 34 - s * 50 + 58 * s + 26 + 'px';
   }
   gaugeV += (level - gaugeV) * 0.3;
   $('gNeedle').style.transform = `translateY(-100%) rotate(${(-80 + gaugeV * 160).toFixed(1)}deg)`;
@@ -142,14 +169,17 @@ async function beginTalk(e) {
   hint.textContent = 'listening…';
   try { await startRec(); } catch { hint.textContent = 'mic blocked'; holding = false; mic.classList.remove('rec'); return; }
   inflating = makeInflating();
+  startLiveCaption();
 }
 async function endTalk() {
   if (!holding) return;
   holding = false;
+  stopLiveCaption();
   mic.classList.remove('rec');
   const wav = stopRec();
   const b = inflating; inflating = null;
   if (!b) return;
+  if (b.cap) b.cap.remove();
   if (!wav) { hint.textContent = 'heard nothing'; b.el.remove(); setTimeout(() => (hint.textContent = 'hold nozzle · speak'), 1400); return; }
 
   hint.textContent = 'reading…';

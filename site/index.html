@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Claude Balloon — speak a task, watch it float, pop when done</title>
+  <meta name="description" content="A tiny Mac toy for Claude agents: hold the nozzle, speak a task, and a balloon carries it across your desktop until the agent finishes — then it pops." />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, "SF Pro Display", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1d2733;
+      background: linear-gradient(180deg, #cfe9fb 0%, #eaf6ff 55%, #fdf3e7 100%);
+      overflow-x: hidden;
+    }
+
+    /* ---------- floating balloons ---------- */
+    .bal {
+      position: fixed; z-index: 0; pointer-events: none;
+      width: 74px; height: 88px;
+      animation: floaty var(--t, 16s) ease-in-out infinite alternate;
+    }
+    .bal .body {
+      width: 100%; height: 100%;
+      border-radius: 50% 50% 48% 48% / 55% 55% 43% 43%;
+      background:
+        radial-gradient(circle at 34% 26%, rgba(255,255,255,.6), rgba(255,255,255,0) 42%),
+        var(--bc);
+      box-shadow: inset -6px -10px 16px rgba(0,0,0,.12);
+      position: relative;
+    }
+    .bal .body::after {
+      content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
+      border: 5px solid transparent; border-top: 8px solid var(--bc);
+    }
+    .bal .str {
+      position: absolute; left: 50%; top: 100%;
+      width: 1.5px; height: 90px;
+      background: rgba(60, 80, 100, .35);
+      transform-origin: top center;
+      animation: sway 5s ease-in-out infinite alternate;
+    }
+    @keyframes floaty { from { transform: translateY(0) rotate(-3deg); } to { transform: translateY(-46px) rotate(3deg); } }
+    @keyframes sway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+
+    /* ---------- layout ---------- */
+    .wrap {
+      position: relative; z-index: 1;
+      max-width: 680px; margin: 0 auto;
+      padding: 90px 28px 70px;
+      text-align: center;
+    }
+    .spark { width: 46px; height: 46px; margin-bottom: 18px; }
+    h1 {
+      font-size: clamp(38px, 7vw, 58px);
+      letter-spacing: -2px; line-height: 1.02;
+      margin-bottom: 16px;
+    }
+    h1 em { font-style: normal; color: #D97757; }
+    .sub {
+      font-size: 18px; line-height: 1.65; color: #45566b;
+      max-width: 540px; margin: 0 auto 34px;
+    }
+    .sub b { color: #1d2733; }
+
+    .dl {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: #1d2733; color: #fff;
+      padding: 16px 28px; border-radius: 16px;
+      font-size: 17px; font-weight: 700; text-decoration: none;
+      box-shadow: 0 14px 34px rgba(29, 39, 51, .3);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .dl:hover { transform: translateY(-2px); box-shadow: 0 20px 44px rgba(29, 39, 51, .35); }
+    .dl small { display: block; font-weight: 500; font-size: 11.5px; opacity: .65; text-align: left; }
+    .free {
+      margin-top: 12px; font-size: 13px; color: #6b7c92;
+    }
+    .free a { color: #D97757; font-weight: 600; text-decoration: none; }
+    .free a:hover { text-decoration: underline; }
+
+    /* ---------- how it works ---------- */
+    .steps {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+      margin: 56px 0 10px;
+    }
+    .step {
+      background: rgba(255, 255, 255, .65);
+      border: 1px solid rgba(29, 39, 51, .08);
+      border-radius: 16px;
+      padding: 18px 14px;
+      backdrop-filter: blur(6px);
+    }
+    .step .ic { font-size: 26px; margin-bottom: 8px; }
+    .step h3 { font-size: 14px; margin-bottom: 5px; }
+    .step p { font-size: 12.5px; line-height: 1.55; color: #5c6d82; }
+
+    .req {
+      margin-top: 26px;
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: 12px; color: #6b7c92; line-height: 1.8;
+    }
+    .req code { background: rgba(29,39,51,.07); padding: 2px 7px; border-radius: 6px; }
+
+    /* ---------- footer ---------- */
+    .foot {
+      margin-top: 60px;
+      display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 9px;
+      padding: 9px 16px; border-radius: 999px;
+      background: #1d2733;
+      text-decoration: none;
+      transition: transform .15s;
+    }
+    .badge:hover { transform: translateY(-1px); }
+    .badge span {
+      font-family: ui-monospace, monospace; font-size: 10.5px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; color: #ffb350;
+    }
+    .badge img { height: 18px; display: block; }
+    .xlink {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 16px; border-radius: 999px;
+      border: 1.5px solid #1d2733;
+      color: #1d2733; font-size: 13px; font-weight: 700; text-decoration: none;
+      transition: transform .15s, background .15s, color .15s;
+    }
+    .xlink:hover { background: #1d2733; color: #fff; transform: translateY(-1px); }
+
+    @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <!-- drifting balloons -->
+  <div class="bal" style="--bc:#ff8c94; left:6%;  top:12%; --t:14s"><div class="body"></div><div class="str"></div></div>
+  <div class="bal" style="--bc:#8fd8cf; left:85%; top:8%;  --t:18s; scale:.7"><div class="body"></div><div class="str"></div></div>
+  <div class="bal" style="--bc:#ffd479; left:76%; top:58%; --t:16s; scale:.85"><div class="body"></div><div class="str"></div></div>
+  <div class="bal" style="--bc:#9db4e8; left:12%; top:64%; --t:20s; scale:.6"><div class="body"></div><div class="str"></div></div>
+  <div class="bal" style="--bc:#c9a3e8; left:48%; top:78%; --t:15s; scale:.5"><div class="body"></div><div class="str"></div></div>
+
+  <div class="wrap">
+    <img class="spark" src="claude.svg" alt="Claude" />
+    <h1>Speak a task.<br /><em>Watch it float.</em></h1>
+    <p class="sub">
+      A tiny Mac toy for Claude agents. Hold the helium tank's nozzle and say what you want done —
+      a balloon inflates with your voice, drifts across your desktop while the agent works,
+      and <b>pops when it's finished</b>, dropping the result. That's it. That's the app.
+    </p>
+
+    <a class="dl" href="https://github.com/milind-soni/claude-balloon/releases/latest/download/ClaudeBalloon.dmg">
+      <span style="font-size:22px">🎈</span>
+      <span>Download for Mac<small>free · Apple Silicon · signed &amp; notarized</small></span>
+    </a>
+    <p class="free">free &amp; open source — <a href="https://github.com/milind-soni/claude-balloon">star it on GitHub</a></p>
+
+    <div class="steps">
+      <div class="step"><div class="ic">🎙</div><h3>Hold &amp; speak</h3><p>The balloon swells with your voice. Transcribed on-device by whisper — no audio ever leaves your Mac.</p></div>
+      <div class="step"><div class="ic">🎈</div><h3>Let go</h3><p>A real Claude Code agent runs your task headlessly. The balloon floats on your desktop; double-click it to watch the agent think.</p></div>
+      <div class="step"><div class="ic">🎉</div><h3>Pop = done</h3><p>Confetti, result card, and a knot kept on the tank. Speak again anytime — every balloon is its own parallel agent.</p></div>
+    </div>
+
+    <p class="req">
+      needs <code>brew install whisper-cpp</code> + <a href="https://claude.com/claude-code" style="color:#D97757">Claude Code</a> logged in<br />
+      your Claude plan powers the agents — no extra keys, no extra bills
+    </p>
+
+    <div class="foot">
+      <a class="badge" href="https://lite.supamaus.com/" target="_blank" rel="noopener">
+        <span>made with</span>
+        <img src="supamaus-brand-white.svg" alt="SupaMaus" />
+      </a>
+      <a class="xlink" href="https://x.com/milindlabs" target="_blank" rel="noopener">
+        𝕏 follow @milindlabs
+      </a>
+    </div>
+  </div>
+</body>
+</html>
