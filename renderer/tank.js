@@ -6,8 +6,16 @@ const $ = (id) => document.getElementById(id);
 const stage = $('stage'), mic = $('mic'), tank = $('tank'), nozzle = $('nozzle'), valve = $('valve');
 const hint = $('hint'), dirLabel = $('dirLabel'), knotsEl = $('knots'), fleetEl = $('fleet'), panels = $('panels');
 
+
 document.addEventListener('pointerover', (e) => window.balloon.setInteractive(!!e.target.closest('.ia')));
 document.addEventListener('pointerout', (e) => { if (!e.relatedTarget) window.balloon.setInteractive(false); });
+
+// side panel: opens on tank hover, lingers long enough to reach it
+const sidePanel = $('sidePanel');
+let panelT = null;
+function openPanel() { clearTimeout(panelT); sidePanel.classList.add('open'); }
+function closePanelSoon() { clearTimeout(panelT); panelT = setTimeout(() => sidePanel.classList.remove('open'), 450); }
+
 
 // ---------- the rope anchor: tell the sky where the nozzle is ----------
 function sendAnchor() {
@@ -255,3 +263,9 @@ window.balloon.onTankEvent((d) => {
     }
   }
 });
+
+// keep the panel alive while the pointer is on the dock OR the panel itself
+for (const el of [mic, sidePanel]) {
+  el.addEventListener('pointerenter', openPanel);
+  el.addEventListener('pointerleave', closePanelSoon);
+}

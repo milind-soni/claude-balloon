@@ -1,9 +1,9 @@
-// The sky: pure display, permanently click-through, one notch above the
-// wallpaper. Every balloon is TIED to the tank's nozzle by a rope with
-// real slack/tension — drag the tank and the whole bouquet comes along.
+// The sky: balloons drift free over the wallpaper, each trailing a string
+// that ends in its task bar — a balloon weight. Drag the bar to park a
+// balloon anywhere; the rope goes taut and holds it there. Physics is two
+// verlet particles (buoyant balloon, heavy bar) joined by a rope.
 const sky = document.getElementById('sky');
 
-// one full-screen SVG holds every string
 const NS = 'http://www.w3.org/2000/svg';
 const svg = document.createElementNS(NS, 'svg');
 svg.setAttribute('id', 'strings');
@@ -11,34 +11,63 @@ svg.setAttribute('width', innerWidth);
 svg.setAttribute('height', innerHeight);
 sky.appendChild(svg);
 
-let anchor = { x: innerWidth / 2, y: innerHeight - 30 }; // the nozzle, in sky coords
+// only the bars are interactive — balloon bodies and empty sky never catch
+// the mouse (clicking the wallpaper is what triggered macOS reveal-desktop)
+document.addEventListener('pointerover', (e) => window.balloon.setInteractive(!!e.target.closest('.ia')));
+document.addEventListener('pointerout', (e) => { if (!e.relatedTarget) window.balloon.setInteractive(false); });
+
+let spawnAt = { x: innerWidth / 2, y: innerHeight - 80 }; // the nozzle's spot
 const balloons = new Map(); // id -> b
+const ROPE = 130; // string length balloon → bar
 
 function spawn({ id, task, color }) {
   const el = document.createElement('div');
   el.className = 'bal';
   el.style.setProperty('--bc', color);
-  el.innerHTML = `<div class="body"></div><div class="tag"></div>`;
-  el.querySelector('.tag').textContent = task;
+  el.innerHTML = `<div class="body"></div>`;
   sky.appendChild(el);
+
+  const bar = document.createElement('div');
+  bar.className = 'bar ia';
+  bar.textContent = task;
+  bar.title = task + ' — drag me to park this balloon';
+  sky.appendChild(bar);
 
   const rope = document.createElementNS(NS, 'path');
   rope.setAttribute('class', 'rope');
   svg.appendChild(rope);
 
-  const L = 200 + (balloons.size % 5) * 46; // each balloon gets its own rope length
-  balloons.set(id, {
-    id, el, rope, color, L,
-    x: anchor.x, y: anchor.y - 60,
-    px: anchor.x, py: anchor.y - 55, // verlet previous position
+  const b = {
+    id, el, bar, rope, color,
+    // balloon particle
+    x: spawnAt.x, y: spawnAt.y, px: spawnAt.x, py: spawnAt.y + 2,
+    // bar (weight) particle
+    wx: spawnAt.x, wy: spawnAt.y + ROPE * 0.4, wpx: spawnAt.x, wpy: spawnAt.y + ROPE * 0.4,
+    pinned: false,   // becomes true once the user parks the bar
+    dragging: false,
     phase: Math.random() * Math.PI * 2,
     wiggle: 0,
+  };
+
+  bar.addEventListener('pointerdown', (e) => {
+    b.dragging = true;
+    bar.setPointerCapture(e.pointerId);
   });
+  bar.addEventListener('pointermove', (e) => {
+    if (!b.dragging) return;
+    b.wx = e.clientX; b.wy = e.clientY;
+    b.wpx = b.wx; b.wpy = b.wy; // no momentum while held
+  });
+  const drop = () => { if (b.dragging) { b.dragging = false; b.pinned = true; } };
+  bar.addEventListener('pointerup', drop);
+  bar.addEventListener('pointercancel', drop);
+  bar.addEventListener('dblclick', () => { b.pinned = false; }); // set it free again
+
+  balloons.set(id, b);
 }
 
 function killBalloon(b) {
-  b.el.remove();
-  b.rope.remove();
+  b.el.remove(); b.bar.remove(); b.rope.remove();
   balloons.delete(b.id);
 }
 
@@ -60,9 +89,9 @@ function popBalloon(b) {
 
 function deflate(b) {
   b.el.classList.add('err');
-  b.rope.remove();
+  b.rope.remove(); b.bar.remove();
   balloons.delete(b.id);
-  b.el.style.transition = 'top 1.4s ease-in, left 1.4s, transform 1.4s, opacity 1.4s';
+  b.el.style.transition = 'top 1.4s ease-in, transform 1.4s, opacity 1.4s';
   requestAnimationFrame(() => {
     b.el.style.top = innerHeight - 40 + 'px';
     b.el.style.transform = 'translate(-50%,-50%) scale(.25) rotate(28deg)';
@@ -71,55 +100,88 @@ function deflate(b) {
   setTimeout(() => b.el.remove(), 1500);
 }
 
-// ---------- rope physics (verlet + distance constraint) ----------
-function tick() {
-  for (const b of balloons.values()) {
-    b.phase += 0.013;
+// ---------- physics ----------
+function integrate(b) {
+  b.phase += 0.013;
 
-    // verlet integration: buoyancy up, gentle sway, drag
-    let vx = (b.x - b.px) * 0.985;
-    let vy = (b.y - b.py) * 0.985;
-    b.px = b.x; b.py = b.y;
-    vy -= 0.055;                                   // helium
-    vx += Math.sin(b.phase) * 0.02 + (Math.random() - 0.5) * 0.012 + b.wiggle * (Math.random() - 0.5);
-    b.wiggle *= 0.9;
-    b.x += vx; b.y += vy;
+  // balloon: buoyant, wandering
+  let vx = (b.x - b.px) * 0.986;
+  let vy = (b.y - b.py) * 0.986;
+  b.px = b.x; b.py = b.y;
+  vy -= 0.05; // helium
+  vx += Math.sin(b.phase) * 0.018 + (Math.random() - 0.5) * 0.012 + b.wiggle * (Math.random() - 0.5);
+  b.wiggle *= 0.9;
+  b.x += vx; b.y += vy;
 
-    // the rope: can't drift farther than L from the nozzle
-    const dx = b.x - anchor.x, dy = b.y - anchor.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    if (dist > b.L) {
-      // taut — project back onto the rope circle (this IS the tension)
-      const k = b.L / dist;
-      b.x = anchor.x + dx * k;
-      b.y = anchor.y + dy * k;
-    }
-
-    // screen edges
-    if (b.x < 60) b.x = 60;
-    if (b.x > innerWidth - 60) b.x = innerWidth - 60;
-    if (b.y < 55) b.y = 55;
-
-    b.el.style.left = b.x + 'px';
-    b.el.style.top = b.y + 'px';
-    const lean = Math.max(-14, Math.min(14, (b.x - b.px) * 6 + Math.sin(b.phase) * 3));
-    b.el.style.transform = `translate(-50%,-50%) rotate(${lean.toFixed(2)}deg)`;
-
-    // draw the rope: sags when slack, straightens when taut
-    const kx = b.x, ky = b.y + 52;                 // the balloon's knot
-    const slack = Math.max(0, b.L - Math.hypot(kx - anchor.x, ky - anchor.y));
-    const sag = Math.min(90, slack * 0.5);
-    const mx = (kx + anchor.x) / 2 + Math.sin(b.phase * 1.4) * Math.min(14, slack * 0.12);
-    const my = (ky + anchor.y) / 2 + sag;
-    b.rope.setAttribute('d', `M ${kx.toFixed(1)} ${ky.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${anchor.x.toFixed(1)} ${anchor.y.toFixed(1)}`);
+  // bar: heavy, dangling (skipped while held or parked)
+  if (!b.dragging && !b.pinned) {
+    let wvx = (b.wx - b.wpx) * 0.97;
+    let wvy = (b.wy - b.wpy) * 0.97;
+    b.wpx = b.wx; b.wpy = b.wy;
+    wvy += 0.14; // gravity
+    b.wx += wvx; b.wy += wvy;
   }
+
+  // the rope: hold balloon and bar within ROPE of each other.
+  // a held/parked bar doesn't move — the balloon takes all the correction
+  // (that's the tension you feel when you drag it around).
+  const dx = b.x - b.wx, dy = b.y - b.wy;
+  const dist = Math.hypot(dx, dy) || 1;
+  if (dist > ROPE) {
+    const excess = (dist - ROPE) / dist;
+    if (b.dragging || b.pinned) {
+      b.x -= dx * excess;
+      b.y -= dy * excess;
+    } else {
+      b.x -= dx * excess * 0.25;  // balloon barely feels the light bar
+      b.wx += dx * excess * 0.75; // the bar mostly follows the balloon
+      b.wy += dy * excess * 0.75;
+      b.y -= dy * excess * 0.25;
+    }
+  }
+
+  // edges
+  if (b.x < 60) b.x = 60;
+  if (b.x > innerWidth - 60) b.x = innerWidth - 60;
+  if (b.y < 55) b.y = 55;
+  if (b.y > innerHeight - 90) b.y = innerHeight - 90;
+  if (!b.dragging && !b.pinned) {
+    if (b.wy > innerHeight - 14) b.wy = innerHeight - 14;
+    if (b.wx < 20) b.wx = 20;
+    if (b.wx > innerWidth - 20) b.wx = innerWidth - 20;
+  }
+}
+
+function render(b) {
+  b.el.style.left = b.x + 'px';
+  b.el.style.top = b.y + 'px';
+  const lean = Math.max(-14, Math.min(14, (b.x - b.px) * 6 + Math.sin(b.phase) * 3));
+  b.el.style.transform = `translate(-50%,-50%) rotate(${lean.toFixed(2)}deg)`;
+
+  b.bar.style.left = b.wx + 'px';
+  b.bar.style.top = b.wy + 'px';
+  b.bar.classList.toggle('pinned', b.pinned);
+
+  // rope from balloon knot to bar top — sags when slack, straight when taut
+  const kx = b.x, ky = b.y + 50;
+  const tx = b.wx, ty = b.wy - 8;
+  const dist = Math.hypot(tx - kx, ty - ky);
+  const slack = Math.max(0, ROPE - dist);
+  const sag = Math.min(60, slack * 0.5);
+  const mx = (kx + tx) / 2 + Math.sin(b.phase * 1.4) * Math.min(10, slack * 0.15);
+  const my = (ky + ty) / 2 + sag;
+  b.rope.setAttribute('d', `M ${kx.toFixed(1)} ${ky.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}`);
+}
+
+function tick() {
+  for (const b of balloons.values()) { integrate(b); render(b); }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
 // ---------- events ----------
 window.balloon.onSkyEvent((d) => {
-  if (d.type === 'anchor') { anchor = { x: d.x, y: d.y }; return; }
+  if (d.type === 'anchor') { spawnAt = { x: d.x, y: Math.max(80, d.y - 40) }; return; }
   if (d.type === 'spawn') return spawn(d);
   const b = balloons.get(d.id);
   if (!b) return;

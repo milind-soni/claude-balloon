@@ -157,15 +157,16 @@ body { font-family: -apple-system, "SF Pro Display", sans-serif; -webkit-font-sm
 /* ---------- side panel: slides out beside the tank on hover ---------- */
 #sidePanel {
   position: absolute;
-  left: calc(50% + 58px);
+  left: calc(50% + 44px);
   bottom: 4px;
-  width: 128px;
+  width: 142px;
+  padding-left: 14px; /* invisible bridge — no dead gap between tank and panel */
   display: flex; flex-direction: column; gap: 8px;
   opacity: 0; transform: translateX(-8px);
   pointer-events: none;
   transition: opacity 0.18s, transform 0.18s;
 }
-#dock:hover #sidePanel { opacity: 1; transform: translateX(0); pointer-events: auto; }
+#sidePanel.open { opacity: 1; transform: translateX(0); pointer-events: auto; }
 
 #fleet { display: flex; flex-direction: column; gap: 4px; }
 .frow {
