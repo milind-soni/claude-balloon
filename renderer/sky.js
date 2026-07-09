@@ -1,54 +1,48 @@
-// The sky window: the desktop itself. Released balloons live here — behind
-// your app windows, floating over the wallpaper until their agent finishes.
+// The sky: pure display, permanently click-through, one notch above the
+// wallpaper. Every balloon is TIED to the tank's nozzle by a rope with
+// real slack/tension — drag the tank and the whole bouquet comes along.
 const sky = document.getElementById('sky');
 
-document.addEventListener('pointerover', (e) => window.balloon.setInteractive(!!e.target.closest('.ia')));
-document.addEventListener('pointerout', (e) => { if (!e.relatedTarget) window.balloon.setInteractive(false); });
+// one full-screen SVG holds every string
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.createElementNS(NS, 'svg');
+svg.setAttribute('id', 'strings');
+svg.setAttribute('width', innerWidth);
+svg.setAttribute('height', innerHeight);
+sky.appendChild(svg);
 
+let anchor = { x: innerWidth / 2, y: innerHeight - 30 }; // the nozzle, in sky coords
 const balloons = new Map(); // id -> b
 
-function spawn({ id, task, color, x, y, cwd }) {
+function spawn({ id, task, color }) {
   const el = document.createElement('div');
-  el.className = 'bal ia';
+  el.className = 'bal';
   el.style.setProperty('--bc', color);
-  el.innerHTML = `<div class="body"></div><div class="string"></div><div class="tag"></div>`;
+  el.innerHTML = `<div class="body"></div><div class="tag"></div>`;
   el.querySelector('.tag').textContent = task;
-  el.title = task;
   sky.appendChild(el);
-  const b = {
-    id, el, task, cwd, color,
-    x: Math.max(70, Math.min(innerWidth - 70, x)), y: Math.max(60, y),
-    vx: (Math.random() - 0.5) * 2, vy: -2.5,
-    scale: 1, phase: Math.random() * Math.PI * 2,
-    wiggle: 0, lines: [], consoleEl: null,
-  };
-  el.querySelector('.body').addEventListener('click', () => nudge(b));
-  el.querySelector('.body').addEventListener('dblclick', () => toggleConsole(b));
-  balloons.set(id, b);
+
+  const rope = document.createElementNS(NS, 'path');
+  rope.setAttribute('class', 'rope');
+  svg.appendChild(rope);
+
+  const L = 200 + (balloons.size % 5) * 46; // each balloon gets its own rope length
+  balloons.set(id, {
+    id, el, rope, color, L,
+    x: anchor.x, y: anchor.y - 60,
+    px: anchor.x, py: anchor.y - 55, // verlet previous position
+    phase: Math.random() * Math.PI * 2,
+    wiggle: 0,
+  });
 }
 
-function nudge(b) { b.vx += (Math.random() - 0.5) * 6; b.vy -= 3; }
-
-// ---------- the little console ----------
-function toggleConsole(b) {
-  if (b.consoleEl) { b.consoleEl.remove(); b.consoleEl = null; return; }
-  const c = document.createElement('div');
-  c.className = 'bcon ia';
-  c.innerHTML = `<div class="bconHead"><span>watching the agent</span><span class="bconX">✕</span></div><div class="bconBody"></div>`;
-  c.querySelector('.bconX').addEventListener('click', () => { c.remove(); b.consoleEl = null; });
-  sky.appendChild(c);
-  b.consoleEl = c;
-  renderConsole(b);
-}
-function renderConsole(b) {
-  if (!b.consoleEl) return;
-  const body = b.consoleEl.querySelector('.bconBody');
-  body.textContent = b.lines.length ? b.lines.slice(-40).join('\n') : 'waiting for the first step…';
-  body.scrollTop = body.scrollHeight;
+function killBalloon(b) {
+  b.el.remove();
+  b.rope.remove();
+  balloons.delete(b.id);
 }
 
-// ---------- pop / deflate / cards ----------
-function popBalloon(b, ok, text) {
+function popBalloon(b) {
   const r = b.el.getBoundingClientRect();
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   for (let i = 0; i < 16; i++) {
@@ -61,77 +55,75 @@ function popBalloon(b, ok, text) {
     p.style.setProperty('--fy', Math.sin(a) * d + 30 + 'px');
     sky.appendChild(p); setTimeout(() => p.remove(), 800);
   }
-  if (b.consoleEl) b.consoleEl.remove();
-  b.el.remove(); balloons.delete(b.id);
-  dropCard(cx, cy, ok, text, b.cwd);
-  window.balloon.tiedKnot({ task: b.task, text: (text || '').slice(0, 600), ok, color: b.color, cwd: b.cwd, at: Date.now() });
+  killBalloon(b);
 }
 
-function deflate(b, detail) {
+function deflate(b) {
   b.el.classList.add('err');
-  if (b.consoleEl) b.consoleEl.remove();
+  b.rope.remove();
   balloons.delete(b.id);
-  b.el.style.transition = 'top 1.4s ease-in, transform 1.4s, opacity 1.4s';
+  b.el.style.transition = 'top 1.4s ease-in, left 1.4s, transform 1.4s, opacity 1.4s';
   requestAnimationFrame(() => {
-    b.el.style.top = innerHeight - 60 + 'px';
-    b.el.style.transform = 'translate(-50%,-50%) scale(.3) rotate(24deg)';
+    b.el.style.top = innerHeight - 40 + 'px';
+    b.el.style.transform = 'translate(-50%,-50%) scale(.25) rotate(28deg)';
     b.el.style.opacity = '0';
   });
   setTimeout(() => b.el.remove(), 1500);
-  dropCard(b.x, innerHeight - 260, false, detail, b.cwd);
-  window.balloon.tiedKnot({ task: b.task, text: (detail || '').slice(0, 600), ok: false, color: b.color, cwd: b.cwd, at: Date.now() });
 }
 
-function dropCard(x, y, ok, text, dir) {
-  const c = document.createElement('div');
-  c.className = `card ia ${ok ? 'ok' : 'bad'}`;
-  c.style.left = Math.max(170, Math.min(innerWidth - 170, x)) + 'px';
-  c.style.top = Math.max(30, Math.min(innerHeight - 280, y)) + 'px';
-  c.innerHTML = `<div class="ct">${ok ? '🎉 done' : '💨 didn’t make it'}</div>
-    <div class="cb"></div><div class="cx">${ok ? '<b class="rv">open the folder →</b> · ' : ''}click to dismiss</div>`;
-  c.querySelector('.cb').textContent = text || '';
-  const rv = c.querySelector('.rv');
-  if (rv) rv.addEventListener('click', (ev) => { ev.stopPropagation(); window.balloon.reveal(dir || ''); });
-  c.addEventListener('click', () => c.remove());
-  sky.appendChild(c);
-  if (ok) setTimeout(() => c.remove(), 60_000);
-}
-
-// ---------- physics ----------
+// ---------- rope physics (verlet + distance constraint) ----------
 function tick() {
   for (const b of balloons.values()) {
-    b.phase += 0.012;
-    const band = 90 + (b.id % 4) * 78;
-    b.vy += (band - b.y) * 0.0016;
-    b.vx += Math.sin(b.phase) * 0.012 + (Math.random() - 0.5) * 0.01 + b.wiggle * (Math.random() - 0.5);
+    b.phase += 0.013;
+
+    // verlet integration: buoyancy up, gentle sway, drag
+    let vx = (b.x - b.px) * 0.985;
+    let vy = (b.y - b.py) * 0.985;
+    b.px = b.x; b.py = b.y;
+    vy -= 0.055;                                   // helium
+    vx += Math.sin(b.phase) * 0.02 + (Math.random() - 0.5) * 0.012 + b.wiggle * (Math.random() - 0.5);
     b.wiggle *= 0.9;
-    b.vx *= 0.985; b.vy *= 0.97;
-    b.x += b.vx; b.y += b.vy;
-    if (b.x < 70) { b.x = 70; b.vx = Math.abs(b.vx); }
-    if (b.x > innerWidth - 70) { b.x = innerWidth - 70; b.vx = -Math.abs(b.vx); }
-    if (b.y < 60) { b.y = 60; b.vy = Math.abs(b.vy) * 0.5; }
+    b.x += vx; b.y += vy;
+
+    // the rope: can't drift farther than L from the nozzle
+    const dx = b.x - anchor.x, dy = b.y - anchor.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    if (dist > b.L) {
+      // taut — project back onto the rope circle (this IS the tension)
+      const k = b.L / dist;
+      b.x = anchor.x + dx * k;
+      b.y = anchor.y + dy * k;
+    }
+
+    // screen edges
+    if (b.x < 60) b.x = 60;
+    if (b.x > innerWidth - 60) b.x = innerWidth - 60;
+    if (b.y < 55) b.y = 55;
+
     b.el.style.left = b.x + 'px';
     b.el.style.top = b.y + 'px';
-    b.el.style.transform = `translate(-50%,-50%) rotate(${(Math.sin(b.phase) * 4).toFixed(2)}deg)`;
-    if (b.consoleEl) {
-      b.consoleEl.style.left = Math.max(150, Math.min(innerWidth - 150, b.x)) + 'px';
-      b.consoleEl.style.top = Math.min(innerHeight - 190, b.y + 120) + 'px';
-    }
+    const lean = Math.max(-14, Math.min(14, (b.x - b.px) * 6 + Math.sin(b.phase) * 3));
+    b.el.style.transform = `translate(-50%,-50%) rotate(${lean.toFixed(2)}deg)`;
+
+    // draw the rope: sags when slack, straightens when taut
+    const kx = b.x, ky = b.y + 52;                 // the balloon's knot
+    const slack = Math.max(0, b.L - Math.hypot(kx - anchor.x, ky - anchor.y));
+    const sag = Math.min(90, slack * 0.5);
+    const mx = (kx + anchor.x) / 2 + Math.sin(b.phase * 1.4) * Math.min(14, slack * 0.12);
+    const my = (ky + anchor.y) / 2 + sag;
+    b.rope.setAttribute('d', `M ${kx.toFixed(1)} ${ky.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${anchor.x.toFixed(1)} ${anchor.y.toFixed(1)}`);
   }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
-// ---------- events from main ----------
+// ---------- events ----------
 window.balloon.onSkyEvent((d) => {
+  if (d.type === 'anchor') { anchor = { x: d.x, y: d.y }; return; }
   if (d.type === 'spawn') return spawn(d);
-  if (d.type === 'reshow') return dropCard(innerWidth / 2, innerHeight / 2 - 100, d.entry.ok, `${d.entry.task}\n\n${d.entry.text}`, d.entry.cwd);
   const b = balloons.get(d.id);
   if (!b) return;
-  if (d.type === 'progress') {
-    b.wiggle = 2.2;
-    if (d.line) { b.lines.push(d.line); if (b.lines.length > 200) b.lines.shift(); renderConsole(b); }
-  }
-  if (d.type === 'done') popBalloon(b, true, d.result);
-  if (d.type === 'error') deflate(b, d.detail);
+  if (d.type === 'progress') b.wiggle = 2.4;
+  if (d.type === 'done') popBalloon(b);
+  if (d.type === 'error') deflate(b);
 });

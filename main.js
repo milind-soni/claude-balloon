@@ -27,7 +27,7 @@ ipcMain.handle('transcribe', async (_e, wavArrayBuffer) => {
   });
 });
 
-// ---------- the agent (Claude Code as a library) ----------
+// ---------- the agent ----------
 let sdk = null;
 async function agentQuery() {
   if (!sdk) sdk = await import('@anthropic-ai/claude-agent-sdk');
@@ -38,18 +38,19 @@ let nextId = 1;
 function toSky(payload) { if (skyWin && !skyWin.isDestroyed()) skyWin.webContents.send('sky-event', payload); }
 function toTank(payload) { if (tankWin && !tankWin.isDestroyed()) tankWin.webContents.send('tank-event', payload); }
 
-// The tank hands a finished recording over: main assigns the id, tells the
-// sky to spawn the floating balloon at the given SCREEN point, and runs the
-// agent — streaming its life to the sky window.
-ipcMain.handle('launch-task', async (_e, { task, color, sx, sy, cwd }) => {
+// The tank hands a finished recording over. The sky gets the floating
+// balloon (pure display, behind your windows); the tank keeps the
+// interactive side: live console lines, the result card, the knot.
+ipcMain.handle('launch-task', async (_e, { task, color, cwd }) => {
   const id = nextId++;
-  const sb = skyWin.getBounds();
-  toSky({ type: 'spawn', id, task, color, x: sx - sb.x, y: sy - sb.y, cwd });
+  toSky({ type: 'spawn', id, task, color });
+  toTank({ type: 'spawn', id, task, color, cwd });
   runAgent(id, task, cwd);
   return { id };
 });
 
 async function runAgent(id, prompt, cwd) {
+  const finish = (payload) => { toSky(payload); toTank(payload); };
   try {
     const query = await agentQuery();
     const stream = query({
@@ -64,33 +65,39 @@ async function runAgent(id, prompt, cwd) {
         const blocks = (msg.message && msg.message.content) || [];
         for (const c of blocks) {
           if (c.type === 'text' && c.text && c.text.trim()) {
-            toSky({ type: 'progress', id, line: '💭 ' + c.text.trim().slice(0, 90) });
+            toTank({ type: 'progress', id, line: '💭 ' + c.text.trim().slice(0, 90) });
           } else if (c.type === 'tool_use') {
             const i = c.input || {};
             const what = i.file_path || i.command || i.pattern || i.description || i.prompt || '';
-            toSky({ type: 'progress', id, line: `⚒ ${c.name}  ${String(what).slice(0, 70)}` });
+            toTank({ type: 'progress', id, line: `⚒ ${c.name}  ${String(what).slice(0, 70)}` });
           }
         }
-        if (!blocks.length) toSky({ type: 'progress', id });
+        toSky({ type: 'progress', id });
       }
       if (msg.type === 'result') {
         const failed = msg.is_error || (msg.subtype && msg.subtype !== 'success');
-        toSky(failed
+        finish(failed
           ? { type: 'error', id, detail: (msg.result || msg.subtype || 'task failed').slice(0, 400) }
           : { type: 'done', id, result: (msg.result || 'done').slice(0, 600) });
         return;
       }
     }
-    toSky({ type: 'error', id, detail: 'agent stream ended without a result' });
+    finish({ type: 'error', id, detail: 'agent stream ended without a result' });
   } catch (err) {
-    toSky({ type: 'error', id, detail: String(err.message || err).slice(0, 400) });
+    finish({ type: 'error', id, detail: String(err.message || err).slice(0, 400) });
   }
 }
 
-// sky tells main a balloon finished → tank ties the knot (always visible)
-ipcMain.on('tied-knot', (_e, knot) => toTank({ type: 'knot', knot }));
-// tank knot clicked → sky re-shows the card
-ipcMain.on('reshow-card', (_e, entry) => toSky({ type: 'reshow', entry }));
+// ---------- tank dragging + the rope anchor ----------
+// The tank window moves wherever you drag it; the sky is told where the
+// nozzle is so every balloon's string stays tied to it.
+ipcMain.on('move-tank', (_e, { x, y }) => {
+  if (tankWin) tankWin.setPosition(Math.round(x), Math.round(y));
+});
+ipcMain.on('anchor', (_e, { sx, sy }) => {
+  const sb = skyWin ? skyWin.getBounds() : { x: 0, y: 0 };
+  toSky({ type: 'anchor', x: sx - sb.x, y: sy - sb.y });
+});
 
 ipcMain.handle('pick-folder', async () => {
   const r = await dialog.showOpenDialog({ title: 'Where should balloon tasks work?', properties: ['openDirectory'] });
@@ -100,22 +107,18 @@ ipcMain.handle('pick-folder', async () => {
 ipcMain.on('reveal', (_e, p) => { if (p && fs.existsSync(p)) shell.openPath(p); });
 ipcMain.on('quit', () => app.quit());
 
-// per-window mouse passthrough: only .ia elements catch the pointer
 ipcMain.on('set-interactive', (e, on) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   if (w) w.setIgnoreMouseEvents(!on, { forward: true });
 });
 
 // ---------- windows ----------
-// tank: small, always on top, clickable — where you speak and balloons inflate
-// sky: the whole desktop, one notch ABOVE the desktop icons (so it still gets
-//      clicks when visible) but below every app window — where balloons live
 let tankWin = null, skyWin = null;
 
 function createWindows() {
   const { workArea } = screen.getPrimaryDisplay();
 
-  const TW = 300, TH = 470;
+  const TW = 400, TH = 640;
   tankWin = new BrowserWindow({
     x: Math.round(workArea.x + workArea.width / 2 - TW / 2),
     y: workArea.y + workArea.height - TH,
@@ -133,12 +136,13 @@ function createWindows() {
     frame: false, transparent: true, resizable: false, hasShadow: false, focusable: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   });
-  // kCGDesktopIconWindowLevel is -2147483603 — sit one above the icons so
-  // balloons are clickable on an exposed desktop, still under all app windows
+  // pure display: one notch above the desktop icons, below every app window,
+  // and it NEVER takes the mouse (double-clicking wallpaper was triggering
+  // macOS "reveal desktop" and scattering everything)
   try { skyWin.setAlwaysOnTop(true, 'normal', -2147483602); }
   catch { skyWin.setAlwaysOnTop(false); }
   skyWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreenSpaces: true });
-  skyWin.setIgnoreMouseEvents(true, { forward: true });
+  skyWin.setIgnoreMouseEvents(true);
   skyWin.loadFile(path.join(__dirname, 'renderer', 'sky.html'));
 }
 

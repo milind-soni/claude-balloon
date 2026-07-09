@@ -8,16 +8,23 @@
 <body class="tankwin">
   <div id="stage"></div>
 
-  <div id="dock" class="ia" title="Hold the nozzle, speak a task, release">
-    <div id="knots" title="popped balloons — click one to see its result"></div>
+  <!-- console + result cards stack above the tank -->
+  <div id="panels"></div>
+
+  <div id="dock" class="ia">
+    <!-- slides out to the right on hover: active balloons + popped knots -->
+    <div id="sidePanel">
+      <div id="fleet"></div>
+      <div id="knots" title="popped balloons — click to re-read the result"></div>
+    </div>
     <div id="mic">
-      <div id="nozzle"><div id="nozzleTip"></div></div>
+      <div id="nozzle" title="Hold, speak a task, release"><div id="nozzleTip"></div></div>
       <div id="valve"></div>
-      <div id="tank">
+      <div id="tank" title="Drag me anywhere">
         <div id="gauge"><div id="gNeedle"></div></div>
         <div class="tankLabel">HELIUM<br /><b>CLAUDE&nbsp;GRADE</b></div>
         <div id="dirLabel" title="Click to change the folder tasks work in">~</div>
-        <div id="hint">hold · speak</div>
+        <div id="hint">hold nozzle · speak</div>
       </div>
     </div>
   </div>
