@@ -1,7 +1,7 @@
 {
   "name": "claude-balloon",
   "productName": "Claude Balloon",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Speak a task, watch a balloon carry it \u2014 it pops when the agent is done",
   "main": "main.js",
   "scripts": {
